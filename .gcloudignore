@@ -1,0 +1,12 @@
+# Keep the Cloud Build upload lean. dist/ MUST be uploaded (it is the built app),
+# so do NOT ignore it even though .gitignore might.
+node_modules/
+.git/
+.env.local
+.env
+src/
+public/
+*.log
+preview.txt
+cwd.js
+README.md

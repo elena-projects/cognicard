@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Georgia', 'Cambria', 'Times New Roman', serif;
+
+  /* CogniCard palette — Morandi grey-warm-blue (灰暖蓝).
+     Overrides the built-in `indigo` scale so every existing indigo-* utility
+     across the app renders in this calm, academic blue. Anchors from the brief:
+     #B4BFD1 (soft accent) → 300, #99A9C6 (highlight) → 400, #828FB0 (labels) → 600,
+     #F3F5F9 (page ground) → 50. */
+  --color-indigo-50:  #f3f5f9;
+  --color-indigo-100: #e7ecf3;
+  --color-indigo-200: #d3dbe9;
+  --color-indigo-300: #b4bfd1;
+  --color-indigo-400: #99a9c6;
+  --color-indigo-500: #8b9bbc;
+  --color-indigo-600: #828fb0;
+  --color-indigo-700: #6b7896;
+  --color-indigo-800: #525c74;
+  --color-indigo-900: #3b4256;
+  --color-indigo-950: #262b37;
+}
+
+@layer base {
+  body {
+    @apply bg-[#F3F5F9] text-[#22272F] antialiased transition-colors duration-300 dark:bg-[#0b0f16] dark:text-[#F1F5F9];
+  }
+}
+
+@layer utilities {
+  .academic-shadow {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.02);
+  }
+  
+  .academic-card-hover {
+    @apply transition-all duration-300 hover:shadow-xl hover:-translate-y-1;
+  }
+}
