@@ -248,10 +248,10 @@ let ai: GoogleGenAI | null = null;
 
 function getAI() {
   if (!ai) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error("GEMINI_API_KEY is not set in environment variables.");
-    }
+    // In production the bundle carries NO real key — nginx injects it server-side
+    // (x-goog-api-key) at the /v1beta proxy. The placeholder just lets the SDK construct.
+    // In dev, the real key from .env.local flows through so the vite proxy works.
+    const apiKey = process.env.GEMINI_API_KEY || 'proxied';
     // Route all Gemini calls through our own origin (a same-origin /v1beta/ proxy),
     // so the browser never talks to googleapis.com directly. This keeps the app working
     // on networks where googleapis.com is blocked/unreachable (e.g. mainland China);

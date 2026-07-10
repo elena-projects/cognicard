@@ -5,10 +5,14 @@ import {defineConfig, loadEnv} from 'vite';
 
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
+  // SECURITY: never bake the Gemini key into the production bundle — it would be publicly
+  // readable in the browser. In prod the key is injected server-side by nginx (see
+  // nginx.conf / Dockerfile). In dev we keep it so the vite same-origin proxy works.
+  const geminiKey = mode === 'production' ? '' : (env.GEMINI_API_KEY || '');
   return {
     plugins: [react(), tailwindcss()],
     define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+      'process.env.GEMINI_API_KEY': JSON.stringify(geminiKey),
     },
     resolve: {
       alias: {
