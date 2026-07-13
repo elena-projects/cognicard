@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { X, Loader2, Waypoints, Sparkles, ChevronLeft, ChevronRight, Lightbulb, Target, Brain, Plus, Minus, Maximize2, Download, MessageSquare, Send, Expand, Shrink } from 'lucide-react';
+import { X, Loader2, Waypoints, Sparkles, ChevronLeft, ChevronRight, Lightbulb, Target, Brain, Plus, Minus, Maximize2, Download, MessageSquare, Send, Expand, Shrink, Smartphone } from 'lucide-react';
 import { Concept, ConceptMapData, analyzeConceptMap, askDocumentQuestion } from './services/geminiService';
 
 /**
@@ -56,13 +56,13 @@ const ConceptMap: React.FC<Props> = ({ concepts, text, lang, onClose }) => {
         legend: '主题分组', hintExpand: '（点开可看要点）', step: '第', of: '/', total: '步',
         pathIntro: '按这个顺序学，最省力：一次只看一个，弄懂了再往下。', whyNow: '为什么现在学这个', prev: '上一个', next: '下一个',
         done: '你已经走完整条学习路径 🎉', restart: '重新开始', error: '生成图谱失败，请重试。', tapConcept: '当前概念',
-        exportImg: '导出图片', fit: '适应窗口', fullMap: '放大整页', showDetails: '显示详情', ai: 'AI 助手', aiHint: '关于这份材料，问我任何问题', aiPh: '问一个关于此材料的问题…', send: '发送', thinking: '思考中…' }
+        exportImg: '导出图片', fit: '适应窗口', fullMap: '放大整页', showDetails: '显示详情', rotateHint: '横屏手机，导图更宽', ai: 'AI 助手', aiHint: '关于这份材料，问我任何问题', aiPh: '问一个关于此材料的问题…', send: '发送', thinking: '思考中…' }
     : { title: 'Concept Map', web: 'Map', focus: 'Focus path', adhd: 'ADHD-friendly', loading: 'Mapping how the concepts connect…',
         startHere: 'Master first', connections: 'Connections', noConn: 'No direct links to other concepts yet.', clickHint: 'Click a theme/concept to expand or collapse; click a concept for its links.',
         legend: 'Themes', hintExpand: '(click to reveal key points)', step: 'Step', of: '/', total: '',
         pathIntro: 'Learn in this order — one at a time. Understand it, then move on.', whyNow: 'Why learn this now', prev: 'Back', next: 'Next',
         done: "You've walked the whole learning path 🎉", restart: 'Start over', error: 'Could not build the map. Please try again.', tapConcept: 'Current concept',
-        exportImg: 'Export PNG', fit: 'Fit', fullMap: 'Full screen', showDetails: 'Show details', ai: 'AI assistant', aiHint: 'Ask me anything about this material', aiPh: 'Ask a question about this material…', send: 'Send', thinking: 'Thinking…' };
+        exportImg: 'Export PNG', fit: 'Fit', fullMap: 'Full screen', showDetails: 'Show details', rotateHint: 'Rotate your phone for a wider map', ai: 'AI assistant', aiHint: 'Ask me anything about this material', aiPh: 'Ask a question about this material…', send: 'Send', thinking: 'Thinking…' };
 
   const [data, setData] = useState<ConceptMapData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -282,10 +282,8 @@ const ConceptMap: React.FC<Props> = ({ concepts, text, lang, onClose }) => {
         </button>
       )}
       {aiOpen && (
-        <div className="fixed inset-0 z-[70] bg-black/30 backdrop-blur-[1px] md:hidden" onClick={() => setAiOpen(false)} />
-      )}
-      {aiOpen && (
-        <div className="fixed z-[71] left-3 right-3 bottom-3 h-[64vh] md:left-auto md:right-5 md:bottom-5 md:w-[380px] md:h-[520px] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-700 flex flex-col overflow-hidden">
+        // Mobile: a dedicated full-screen page (its own view, not overlaid on the map). Desktop: a floating card.
+        <div className="fixed inset-0 z-[80] bg-white dark:bg-slate-900 flex flex-col md:inset-auto md:right-5 md:bottom-5 md:w-[380px] md:h-[520px] md:rounded-2xl md:shadow-2xl md:border md:border-gray-100 md:dark:border-slate-700 overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-slate-800 bg-indigo-50/60 dark:bg-slate-800/50">
             <MessageSquare size={16} className="text-indigo-600 dark:text-indigo-400" />
             <span className="font-bold text-sm text-gray-800 dark:text-slate-100">{T.ai}</span>
@@ -393,6 +391,11 @@ const ConceptMap: React.FC<Props> = ({ concepts, text, lang, onClose }) => {
             </div>
             <button onClick={exportPNG} className="absolute top-3 left-3 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/90 dark:bg-slate-800/90 border border-gray-200 dark:border-slate-700 text-[12.5px] font-bold text-gray-600 dark:text-slate-300 shadow-sm hover:text-indigo-600 transition-colors"><Download size={14} /> {T.exportImg}</button>
             <p className="absolute bottom-3 left-3 text-[11px] text-gray-400 dark:text-slate-600 max-w-[60%] leading-snug pointer-events-none">{T.clickHint}</p>
+
+            {/* when maximized on a portrait phone, nudge to rotate for a wider landscape view (auto-hides in landscape) */}
+            {mapFull && (
+              <div className="md:hidden landscape:hidden absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 text-[11px] font-semibold text-indigo-600 dark:text-indigo-300 bg-white/90 dark:bg-slate-800/90 border border-indigo-100 dark:border-slate-700 rounded-full px-3 py-1.5 shadow-sm pointer-events-none whitespace-nowrap"><Smartphone size={12} /> {T.rotateHint}</div>
+            )}
 
             {AIWidget}
           </div>
