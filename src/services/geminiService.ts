@@ -63,7 +63,7 @@ export async function generateQuiz(
   const genAI = getAI();
   const context = `SOURCE TEXT:\n${text.slice(0, 6000)}\n\nKEY CONCEPTS:\n${concepts.map((c) => `- ${c.term}: ${c.definition}`).join('\n')}`;
   const response = await genAI.models.generateContent({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-2.5-flash',
     contents: [{ role: 'user', parts: [{ text: context }] }],
     config: {
       systemInstruction: `You are an academic tutor building an active-recall quiz to help a student check their understanding of the material.
@@ -129,7 +129,7 @@ export async function analyzeConceptMap(
   const genAI = getAI();
   const context = `SOURCE TEXT (excerpt):\n${text.slice(0, 6000)}\n\nEXTRACTED CONCEPTS:\n${concepts.map((c) => `- ${c.term}: ${c.definition}`).join('\n')}`;
   const response = await genAI.models.generateContent({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-2.5-flash',
     contents: [{ role: 'user', parts: [{ text: context }] }],
     config: {
       systemInstruction: `You are an expert learning-science tutor building a CONCEPT MAP (mind map) that reveals how the key concepts of this material connect, so a student can truly understand and learn it.
@@ -336,7 +336,7 @@ export async function analyzeText(text: string, language: 'English' | 'Chinese' 
   const { min, max, target } = conceptRange(text, !!image);
 
   const response = await genAI.models.generateContent({
-    model: "gemini-3-flash-preview",
+    model: "gemini-2.5-flash",
     contents: [{ role: "user", parts: contentParts }],
     config: {
       systemInstruction: `${CONCEPTS_SYSTEM_INSTRUCTION}\n\nTARGET COUNT: Extract about ${target} concepts for this text — no fewer than ${min}, no more than ${max}. Choose the number that honestly fits the content; do not stretch to reach ${max}.\n\nCRITICAL: Please output your response entirely in ${language}.`,
@@ -385,7 +385,7 @@ export async function analyzeOverview(text: string, language: 'English' | 'Chine
   if (contentParts.length === 0) throw new Error("No input provided");
 
   const response = await genAI.models.generateContent({
-    model: "gemini-3-flash-preview",
+    model: "gemini-2.5-flash",
     contents: [{ role: "user", parts: contentParts }],
     config: {
       systemInstruction: `${OVERVIEW_SYSTEM_INSTRUCTION}\n\nCRITICAL: Please output your response entirely in ${language}.`,
@@ -427,7 +427,7 @@ export async function analyzeConceptDeepDive(term: string, context: string, lang
   const genAI = getAI();
   
   const response = await genAI.models.generateContent({
-    model: "gemini-3-flash-preview",
+    model: "gemini-2.5-flash",
     contents: [
       { role: "user", parts: [{ text: `Term: ${term}\n\nContext:\n${context}` }] }
     ],
@@ -545,7 +545,7 @@ CRITICAL INSTRUCTIONS FOR IMAGE/DOCUMENT ANALYSIS & LONG-FORM CONTEXT:
   contents.push({ role: 'user', parts: currentUserParts });
 
   const response = await genAI.models.generateContent({
-    model: "gemini-3-flash-preview",
+    model: "gemini-2.5-flash",
     contents: contents,
     config: {
       systemInstruction: systemInstruction,

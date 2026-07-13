@@ -42,7 +42,7 @@ const App: React.FC = () => {
   const [userQuestion, setUserQuestion] = useState('');
   const [isAnswering, setIsAnswering] = useState(false);
   const [allConceptsCopied, setAllConceptsCopied] = useState(false);
-  const [outputLanguage, setOutputLanguage] = useState<'English' | 'Chinese'>('Chinese');
+  const [outputLanguage, setOutputLanguage] = useState<'English' | 'Chinese'>(() => (typeof navigator !== 'undefined' && (navigator.language || '').toLowerCase().startsWith('zh')) ? 'Chinese' : 'English');
   const [showReader, setShowReader] = useState(false);
   const [showQuiz, setShowQuiz] = useState(false);
   const [showReview, setShowReview] = useState(false);

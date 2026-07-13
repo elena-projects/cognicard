@@ -70,6 +70,7 @@ const ConceptMap: React.FC<Props> = ({ concepts, text, lang, onClose }) => {
   const [mode, setMode] = useState<'web' | 'focus'>('web');
   const [active, setActive] = useState<string | null>(null);
   const [step, setStep] = useState(0);
+  const [animReady, setAnimReady] = useState(false); // node transitions off during the initial collapse (avoids a mass-animation jank right when the map generates)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   // zoom / pan
@@ -77,6 +78,15 @@ const ConceptMap: React.FC<Props> = ({ concepts, text, lang, onClose }) => {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const treeRef = useRef<SVGGElement | null>(null);
   const dragRef = useRef<{ x: number; y: number; tx: number; ty: number; moved: boolean } | null>(null);
+  const viewRef = useRef(view);                 // always-current view (mirrors state; ahead of it during a drag)
+  const gRef = useRef<SVGGElement | null>(null); // the pan/zoom <g>; transform is set imperatively while dragging
+  // Update the transform. During a drag we set it directly on the DOM (no React re-render → smooth on phones);
+  // `commit` writes it back to state so the rest of the component stays in sync.
+  const applyView = (v: { s: number; tx: number; ty: number }, commit: boolean) => {
+    viewRef.current = v;
+    gRef.current?.setAttribute('transform', `translate(${v.tx},${v.ty}) scale(${v.s})`);
+    if (commit) setView(v);
+  };
 
   // AI assistant
   const [aiOpen, setAiOpen] = useState(false);
@@ -119,7 +129,10 @@ const ConceptMap: React.FC<Props> = ({ concepts, text, lang, onClose }) => {
     if (!root) return;
     const c = new Set<string>();
     root.children.forEach((g) => g.children.forEach((con) => { if (con.children.length) c.add(con.id); }));
+    setAnimReady(false);        // snap the initial collapse into place (no per-node animation → smoother generation)
     setCollapsed(c);
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => setAnimReady(true))); // re-enable animation once settled
+    return () => cancelAnimationFrame(id);
   }, [root]);
 
   // Radial layout — angular span per subtree ∝ its (visible) leaf count.
@@ -157,7 +170,7 @@ const ConceptMap: React.FC<Props> = ({ concepts, text, lang, onClose }) => {
   // fit the whole graph into the viewport
   const fit = () => {
     const s = Math.min(VBW / bbox.w, VBH / bbox.h) * 0.94;
-    setView({ s, tx: VBW / 2 - s * (bbox.x + bbox.w / 2), ty: VBH / 2 - s * (bbox.y + bbox.h / 2) });
+    applyView({ s, tx: VBW / 2 - s * (bbox.x + bbox.w / 2), ty: VBH / 2 - s * (bbox.y + bbox.h / 2) }, true);
   };
   useEffect(() => { if (nodes.length) fit(); /* refit when the tree shape changes */ // eslint-disable-next-line
   }, [bbox.x, bbox.y, bbox.w, bbox.h]);
@@ -169,11 +182,12 @@ const ConceptMap: React.FC<Props> = ({ concepts, text, lang, onClose }) => {
     const r = svgRef.current!.getBoundingClientRect();
     return { x: ((clientX - r.left) / r.width) * VBW, y: ((clientY - r.top) / r.height) * VBH };
   };
-  const zoomAt = (vx: number, vy: number, factor: number) => setView((v) => {
+  const zoomAt = (vx: number, vy: number, factor: number) => {
+    const v = viewRef.current;
     const s = Math.max(0.35, Math.min(2.4, v.s * factor));
     const gx = (vx - v.tx) / v.s, gy = (vy - v.ty) / v.s;
-    return { s, tx: vx - gx * s, ty: vy - gy * s };
-  });
+    applyView({ s, tx: vx - gx * s, ty: vy - gy * s }, true);
+  };
   const onWheel = (e: React.WheelEvent) => { e.preventDefault(); const p = toVB(e.clientX, e.clientY); zoomAt(p.x, p.y, e.deltaY < 0 ? 1.12 : 0.89); };
   const onPointerDown = (e: React.PointerEvent) => { (e.target as Element).setPointerCapture?.(e.pointerId); dragRef.current = { x: e.clientX, y: e.clientY, tx: view.tx, ty: view.ty, moved: false }; };
   const onPointerMove = (e: React.PointerEvent) => {
@@ -181,9 +195,9 @@ const ConceptMap: React.FC<Props> = ({ concepts, text, lang, onClose }) => {
     const r = svgRef.current!.getBoundingClientRect();
     const dx = ((e.clientX - d.x) / r.width) * VBW, dy = ((e.clientY - d.y) / r.height) * VBH;
     if (Math.abs(e.clientX - d.x) + Math.abs(e.clientY - d.y) > 4) d.moved = true;
-    setView((v) => ({ ...v, tx: d.tx + dx, ty: d.ty + dy }));
+    applyView({ ...viewRef.current, tx: d.tx + dx, ty: d.ty + dy }, false); // imperative: no re-render mid-drag
   };
-  const onPointerUp = () => { dragRef.current = null; };
+  const onPointerUp = () => { if (dragRef.current?.moved) setView(viewRef.current); dragRef.current = null; };
   const clickNode = (n: TNode) => {
     if (dragRef.current?.moved) return;
     if (n.kind === 'group') { toggle(n.id); return; }
@@ -304,7 +318,7 @@ const ConceptMap: React.FC<Props> = ({ concepts, text, lang, onClose }) => {
             <svg ref={svgRef} viewBox={`0 0 ${VBW} ${VBH}`} className="w-full h-full touch-none" style={{ cursor: dragRef.current ? 'grabbing' : 'grab' }}
               onWheel={onWheel} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerUp}
               onClick={() => { if (!dragRef.current?.moved) setActive(null); }}>
-              <g transform={`translate(${view.tx},${view.ty}) scale(${view.s})`}>
+              <g ref={gRef} transform={`translate(${view.tx},${view.ty}) scale(${view.s})`}>
                 <g ref={treeRef}>
                   {/* edges */}
                   {edges.map((e, i) => {
@@ -329,7 +343,7 @@ const ConceptMap: React.FC<Props> = ({ concepts, text, lang, onClose }) => {
                     if (n.kind === 'aspect') {
                       const lines = wrapLabel(n.label, 12, 2);
                       return (
-                        <g key={n.id} transform={`translate(${n.x},${n.y})`} style={{ transition: 'transform .4s ease' }}>
+                        <g key={n.id} transform={`translate(${n.x},${n.y})`} style={{ transition: animReady ? 'transform .4s ease' : 'none' }}>
                           <circle cx={-2} cy={0} r={3} fill={GROUP_COLORS[n.gi % 4]} />
                           {lines.map((ln, i) => <text key={i} x={8} y={(i - (lines.length - 1) / 2) * 13} dominantBaseline="middle" fill="#6b7896" style={{ fontSize: 11 }}>{ln}</text>)}
                         </g>
@@ -344,7 +358,7 @@ const ConceptMap: React.FC<Props> = ({ concepts, text, lang, onClose }) => {
                     const dim = active != null && n.kind === 'concept' && !on && !activeLinks.some((l) => l.from === n.label || l.to === n.label);
                     const collapsedHasKids = (isGroup || n.kind === 'concept') && n.children.length > 0;
                     return (
-                      <g key={n.id} transform={`translate(${n.x},${n.y})`} style={{ transition: 'transform .4s ease', cursor: isRoot ? 'default' : 'pointer' }} opacity={dim ? 0.3 : 1}
+                      <g key={n.id} transform={`translate(${n.x},${n.y})`} style={{ transition: animReady ? 'transform .4s ease' : 'none', cursor: isRoot ? 'default' : 'pointer' }} opacity={dim ? 0.3 : 1}
                         onClick={(ev) => { ev.stopPropagation(); clickNode(n); }}>
                         {isRoot
                           ? <ellipse cx={0} cy={0} rx={w / 2} ry={h / 2 + 6} fill={ROOT_COLOR} />
