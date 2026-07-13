@@ -281,7 +281,10 @@ const ConceptMap: React.FC<Props> = ({ concepts, text, lang, onClose }) => {
         </button>
       )}
       {aiOpen && (
-        <div className="absolute bottom-5 right-5 z-20 w-[min(92vw,380px)] h-[min(70vh,520px)] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-700 flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-[70] bg-black/30 backdrop-blur-[1px] md:hidden" onClick={() => setAiOpen(false)} />
+      )}
+      {aiOpen && (
+        <div className="fixed z-[71] left-3 right-3 bottom-3 h-[64vh] md:left-auto md:right-5 md:bottom-5 md:w-[380px] md:h-[520px] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-700 flex flex-col overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-slate-800 bg-indigo-50/60 dark:bg-slate-800/50">
             <MessageSquare size={16} className="text-indigo-600 dark:text-indigo-400" />
             <span className="font-bold text-sm text-gray-800 dark:text-slate-100">{T.ai}</span>

@@ -146,6 +146,7 @@ const FocusReader: React.FC<Props> = ({ text, lang, isDark, onClose }) => {
   const modeRef = useRef<'gemini' | 'browser'>('gemini');
   const primedRef = useRef(false);
   const lastWiRef = useRef(-1);
+  const rafRef = useRef<number | null>(null); // requestAnimationFrame id — drives precise, smooth word highlighting
 
   // Unlock audio playback within a user gesture (call synchronously from onClick).
   const prime = useCallback(() => {
@@ -208,15 +209,23 @@ const FocusReader: React.FC<Props> = ({ text, lang, isDark, onClose }) => {
   // Spread the CURRENT chunk's short duration across its words (length-weighted).
   const computeChunkTimes = (ci: number, duration: number) => {
     const { wiStart, wiEnd } = chunks[ci];
-    let total = 0;
-    for (let i = wiStart; i < wiEnd; i++) total += words[i].weight;
-    total = total || 1;
+    // Estimate each word's spoken share of the chunk: a base (so short words aren't
+    // rushed) + its length + extra time for the natural pause after trailing
+    // punctuation. Closer to real speech rhythm → the highlight tracks the voice better.
+    const wgt: number[] = [];
+    for (let i = wiStart; i < wiEnd; i++) {
+      const nextCh = plain[words[i].end] || '';
+      const sentEnd = /[.!?。！？…]/.test(nextCh);
+      const pause = /[,;:—、，；：)"'’”]/.test(nextCh);
+      wgt.push(1.4 + words[i].weight + (sentEnd ? 3.2 : pause ? 1.6 : 0));
+    }
+    const total = wgt.reduce((s, x) => s + x, 0) || 1;
     let acc = 0;
     const arr: { wi: number; start: number; end: number }[] = [];
-    for (let i = wiStart; i < wiEnd; i++) {
+    for (let k = 0; k < wgt.length; k++) {
       const start = (acc / total) * duration;
-      acc += words[i].weight;
-      arr.push({ wi: i, start, end: (acc / total) * duration });
+      acc += wgt[k];
+      arr.push({ wi: wiStart + k, start, end: (acc / total) * duration });
     }
     chunkTimesRef.current = arr;
   };
@@ -241,11 +250,26 @@ const FocusReader: React.FC<Props> = ({ text, lang, isDark, onClose }) => {
     setProgress(words.length ? Math.min(1, (wi + 1) / words.length) : 0);
   }, [words, chunks]);
 
+  // Poll the audio clock every animation frame so the highlight lands on the right
+  // word exactly when it's spoken (the 'timeupdate' event alone only fires ~4x/sec,
+  // which makes the highlight lag and jump). Self-terminates when paused/stopped/ended.
+  const drivePump = useCallback(() => {
+    if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    const loop = () => {
+      const a = audioRef.current;
+      if (!a || stoppedRef.current || modeRef.current !== 'gemini' || a.paused || a.ended) { rafRef.current = null; return; }
+      updateFromTime();
+      rafRef.current = requestAnimationFrame(loop);
+    };
+    rafRef.current = requestAnimationFrame(loop);
+  }, [updateFromTime]);
+
   const stop = useCallback(() => {
     stoppedRef.current = true;
     chunkRef.current = -1;
     if (modeRef.current === 'browser') { try { window.speechSynthesis.cancel(); } catch {} }
     else { const a = audioRef.current; if (a) { a.onended = null; a.pause(); try { a.currentTime = 0; } catch {} } }
+    if (rafRef.current != null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
     setSpeaking(false); setPaused(false); setSpokenWi(-1); setProgress(0);
     lastWiRef.current = -1;
   }, []);
@@ -301,12 +325,13 @@ const FocusReader: React.FC<Props> = ({ text, lang, isDark, onClose }) => {
     let fromTime = 0;
     if (fromWi != null) { const e = chunkTimesRef.current.find((x) => x.wi === fromWi); if (e) fromTime = e.start; }
     try { a.currentTime = fromTime; } catch {}
-    a.ontimeupdate = () => updateFromTime();
+    a.ontimeupdate = () => updateFromTime();  // backstop (fires in background tabs where rAF is throttled)
     a.onended = () => { if (!stoppedRef.current) playChunk(chunkRef.current + 1); };
     await a.play();
+    drivePump();  // precise per-frame highlight tracking
     setSpeaking(true); setPaused(false); setEngine('gemini'); setTtsErr('');
     if (ci + 1 < chunks.length) synthChunk(ci + 1).catch(() => {}); // prefetch next
-  }, [chunks, synthChunk, rate, updateFromTime]);
+  }, [chunks, synthChunk, rate, updateFromTime, drivePump]);
 
   const play = useCallback(async () => {
     if (!chunks.length) return;
@@ -348,7 +373,7 @@ const FocusReader: React.FC<Props> = ({ text, lang, isDark, onClose }) => {
     }
     if (paused) {
       if (modeRef.current === 'browser') { try { window.speechSynthesis.resume(); } catch {} }
-      else audioRef.current?.play();
+      else { audioRef.current?.play(); drivePump(); }
       setPaused(false);
       return;
     }
