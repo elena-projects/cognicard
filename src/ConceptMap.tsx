@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { X, Loader2, Waypoints, Sparkles, ChevronLeft, ChevronRight, Lightbulb, Target, Brain, Plus, Minus, Maximize2, Download, MessageSquare, Send } from 'lucide-react';
+import { X, Loader2, Waypoints, Sparkles, ChevronLeft, ChevronRight, Lightbulb, Target, Brain, Plus, Minus, Maximize2, Download, MessageSquare, Send, Expand, Shrink } from 'lucide-react';
 import { Concept, ConceptMapData, analyzeConceptMap, askDocumentQuestion } from './services/geminiService';
 
 /**
@@ -56,13 +56,13 @@ const ConceptMap: React.FC<Props> = ({ concepts, text, lang, onClose }) => {
         legend: '主题分组', hintExpand: '（点开可看要点）', step: '第', of: '/', total: '步',
         pathIntro: '按这个顺序学，最省力：一次只看一个，弄懂了再往下。', whyNow: '为什么现在学这个', prev: '上一个', next: '下一个',
         done: '你已经走完整条学习路径 🎉', restart: '重新开始', error: '生成图谱失败，请重试。', tapConcept: '当前概念',
-        exportImg: '导出图片', fit: '适应窗口', ai: 'AI 助手', aiHint: '关于这份材料，问我任何问题', aiPh: '问一个关于此材料的问题…', send: '发送', thinking: '思考中…' }
+        exportImg: '导出图片', fit: '适应窗口', fullMap: '放大整页', showDetails: '显示详情', ai: 'AI 助手', aiHint: '关于这份材料，问我任何问题', aiPh: '问一个关于此材料的问题…', send: '发送', thinking: '思考中…' }
     : { title: 'Concept Map', web: 'Map', focus: 'Focus path', adhd: 'ADHD-friendly', loading: 'Mapping how the concepts connect…',
         startHere: 'Master first', connections: 'Connections', noConn: 'No direct links to other concepts yet.', clickHint: 'Click a theme/concept to expand or collapse; click a concept for its links.',
         legend: 'Themes', hintExpand: '(click to reveal key points)', step: 'Step', of: '/', total: '',
         pathIntro: 'Learn in this order — one at a time. Understand it, then move on.', whyNow: 'Why learn this now', prev: 'Back', next: 'Next',
         done: "You've walked the whole learning path 🎉", restart: 'Start over', error: 'Could not build the map. Please try again.', tapConcept: 'Current concept',
-        exportImg: 'Export PNG', fit: 'Fit', ai: 'AI assistant', aiHint: 'Ask me anything about this material', aiPh: 'Ask a question about this material…', send: 'Send', thinking: 'Thinking…' };
+        exportImg: 'Export PNG', fit: 'Fit', fullMap: 'Full screen', showDetails: 'Show details', ai: 'AI assistant', aiHint: 'Ask me anything about this material', aiPh: 'Ask a question about this material…', send: 'Send', thinking: 'Thinking…' };
 
   const [data, setData] = useState<ConceptMapData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -71,6 +71,7 @@ const ConceptMap: React.FC<Props> = ({ concepts, text, lang, onClose }) => {
   const [active, setActive] = useState<string | null>(null);
   const [step, setStep] = useState(0);
   const [animReady, setAnimReady] = useState(false); // node transitions off during the initial collapse (avoids a mass-animation jank right when the map generates)
+  const [mapFull, setMapFull] = useState(false);      // full-page map: hides the side rail so the mind map fills the screen (great on phones)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   // zoom / pan
@@ -385,6 +386,7 @@ const ConceptMap: React.FC<Props> = ({ concepts, text, lang, onClose }) => {
 
             {/* zoom / export controls */}
             <div className="absolute top-3 right-3 flex flex-col gap-1.5">
+              <button onClick={() => setMapFull((f) => !f)} title={mapFull ? T.showDetails : T.fullMap} className={`w-9 h-9 rounded-lg border shadow-sm flex items-center justify-center transition-colors ${mapFull ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white/90 dark:bg-slate-800/90 border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-300 hover:text-indigo-600'}`}>{mapFull ? <Shrink size={15} /> : <Expand size={15} />}</button>
               <button onClick={() => zoomAt(VBW / 2, VBH / 2, 1.2)} title="Zoom in" className="w-9 h-9 rounded-lg bg-white/90 dark:bg-slate-800/90 border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-300 shadow-sm flex items-center justify-center hover:text-indigo-600"><Plus size={16} /></button>
               <button onClick={() => zoomAt(VBW / 2, VBH / 2, 0.83)} title="Zoom out" className="w-9 h-9 rounded-lg bg-white/90 dark:bg-slate-800/90 border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-300 shadow-sm flex items-center justify-center hover:text-indigo-600"><Minus size={16} /></button>
               <button onClick={fit} title={T.fit} className="w-9 h-9 rounded-lg bg-white/90 dark:bg-slate-800/90 border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-300 shadow-sm flex items-center justify-center hover:text-indigo-600"><Maximize2 size={15} /></button>
@@ -395,8 +397,8 @@ const ConceptMap: React.FC<Props> = ({ concepts, text, lang, onClose }) => {
             {AIWidget}
           </div>
 
-          {/* side rail: analysis + active concept */}
-          <div className="w-full md:w-[320px] shrink-0 border-t md:border-t-0 md:border-l border-gray-100 dark:border-slate-800 overflow-y-auto p-4 space-y-4 bg-white dark:bg-[#0b1220] max-h-[42vh] md:max-h-none">
+          {/* side rail: analysis + active concept (hidden when the map is maximized) */}
+          <div className={`w-full md:w-[320px] shrink-0 border-t md:border-t-0 md:border-l border-gray-100 dark:border-slate-800 overflow-y-auto p-4 space-y-4 bg-white dark:bg-[#0b1220] max-h-[42vh] md:max-h-none ${mapFull ? 'hidden' : ''}`}>
             {Analysis}
             {active ? (
               <div className="rounded-2xl border border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-4 shadow-sm">
