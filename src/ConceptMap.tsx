@@ -96,6 +96,27 @@ const ConceptMap: React.FC<Props> = ({ concepts, text, lang, onClose }) => {
   const [aiSending, setAiSending] = useState(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
+  // Fit the mobile AI page to the space above the on-screen keyboard. Without this, iOS
+  // shifts the fixed panel when the input is focused, floating it mid-screen and revealing
+  // the map behind it. We size/position the panel to the visualViewport instead.
+  const [isNarrow, setIsNarrow] = useState(false);
+  const [kbInset, setKbInset] = useState<{ top: number; height: number } | null>(null);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const on = () => setIsNarrow(mq.matches);
+    on(); mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!aiOpen || !isNarrow || !vv) { setKbInset(null); return; }
+    const update = () => setKbInset({ top: vv.offsetTop, height: vv.height });
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
+  }, [aiOpen, isNarrow]);
+
   const defByTerm = useMemo(() => { const m = new Map<string, string>(); concepts.forEach((c) => m.set(c.term, c.definition)); return m; }, [concepts]);
 
   useEffect(() => {
@@ -283,7 +304,8 @@ const ConceptMap: React.FC<Props> = ({ concepts, text, lang, onClose }) => {
       )}
       {aiOpen && (
         // Mobile: a dedicated full-screen page (its own view, not overlaid on the map). Desktop: a floating card.
-        <div className="fixed inset-0 z-[80] bg-white dark:bg-slate-900 flex flex-col md:inset-auto md:right-5 md:bottom-5 md:w-[380px] md:h-[520px] md:rounded-2xl md:shadow-2xl md:border md:border-gray-100 md:dark:border-slate-700 overflow-hidden">
+        <div className="fixed inset-0 z-[80] bg-white dark:bg-slate-900 flex flex-col md:inset-auto md:right-5 md:bottom-5 md:w-[380px] md:h-[520px] md:rounded-2xl md:shadow-2xl md:border md:border-gray-100 md:dark:border-slate-700 overflow-hidden"
+          style={kbInset ? { top: kbInset.top, height: kbInset.height, bottom: 'auto' } : undefined}>
           <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-slate-800 bg-indigo-50/60 dark:bg-slate-800/50">
             <MessageSquare size={16} className="text-indigo-600 dark:text-indigo-400" />
             <span className="font-bold text-sm text-gray-800 dark:text-slate-100">{T.ai}</span>
