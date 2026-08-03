@@ -461,22 +461,33 @@ const App: React.FC = () => {
       setIsReadingFile(true);
       const reader = new FileReader();
       reader.onload = async (event) => {
+        const zh = outputLanguage === 'Chinese';
         try {
           const typedarray = new Uint8Array(event.target?.result as ArrayBuffer);
-          const loadingTask = pdfjs.getDocument({ data: typedarray });
-          const pdf = await loadingTask.promise;
+          const pdf = await pdfjs.getDocument({ data: typedarray }).promise;
           let fullText = '';
           for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
             const textContent = await page.getTextContent();
-            const pageText = textContent.items.map((item: any) => item.str).join(' ');
-            fullText += pageText + '\n';
+            fullText += textContent.items.map((item: any) => item.str).join(' ') + '\n';
+          }
+          if (!fullText.trim()) {
+            // The PDF opened fine but has no text layer — almost always a scanned/image PDF.
+            setError(zh
+              ? '这个 PDF 里没有可提取的文字（多半是扫描/图片版）。请换成文字版 PDF，或直接把文字粘贴进来。'
+              : 'This PDF has no selectable text (it looks like scanned images). Use a text-based PDF, or paste the text in instead.');
+            return;
           }
           setInputText(fullText);
           executeAnalysis(fullText, selectedImage, analysisType);
-        } catch (err) {
+        } catch (err: any) {
           console.error('PDF parsing error:', err);
-          setError('Failed to parse PDF document.');
+          const m = String(err?.message || err || '');
+          if (err?.name === 'PasswordException' || /password/i.test(m)) {
+            setError(zh ? '这个 PDF 有密码保护，读不了。请去掉密码后再上传。' : 'This PDF is password-protected — remove the password and try again.');
+          } else {
+            setError((zh ? '读取 PDF 失败：' : 'Failed to read this PDF: ') + (m.slice(0, 140) || 'unknown error'));
+          }
         } finally {
           setIsReadingFile(false);
         }
