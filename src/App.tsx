@@ -13,8 +13,11 @@ import ReviewDeck from './ReviewDeck';
 import ConceptMap from './ConceptMap';
 import './index.css';
 
-// Set up PDF.js worker — bundled locally (same-origin) so it loads even where the CDN is blocked/slow.
-pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+// Set up PDF.js worker — create the module worker ourselves and hand it to pdf.js as a
+// workerPort. Using workerSrc made pdf.js fall back to its "fake worker" (a main-thread
+// dynamic import()) which failed ("Failed to fetch dynamically imported module"); giving it
+// a ready worker avoids that path entirely. The worker is bundled locally (same-origin).
+pdfjs.GlobalWorkerOptions.workerPort = new Worker(pdfWorkerUrl, { type: 'module' });
 
 // Detect whether the source text is predominantly Chinese, so the analysis output
 // (concepts, definitions, overview) comes back in the SAME language the user pasted.
