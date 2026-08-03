@@ -16,6 +16,14 @@ import './index.css';
 // Set up PDF.js worker — bundled locally (same-origin) so it loads even where the CDN is blocked/slow.
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
+// Detect whether the source text is predominantly Chinese, so the analysis output
+// (concepts, definitions, overview) comes back in the SAME language the user pasted.
+const detectLang = (t: string): 'English' | 'Chinese' => {
+  const cjk = (t.match(/[一-鿿㐀-䶿]/g) || []).length;
+  const nonSpace = t.replace(/\s/g, '').length || 1;
+  return cjk >= 8 || cjk / nonSpace > 0.15 ? 'Chinese' : 'English';
+};
+
 type AnalysisType = 'concepts' | 'overview';
 
 const App: React.FC = () => {
@@ -367,13 +375,17 @@ const App: React.FC = () => {
     setConcepts([]);
     setOverview(null);
 
+    // Output in the SAME language as the pasted text (not the browser/UI toggle).
+    const lang = text.trim() ? detectLang(text) : outputLanguage;
+    if (lang !== outputLanguage) setOutputLanguage(lang);
+
     try {
       if (type === 'concepts') {
-        const response = await analyzeText(text, outputLanguage, image || undefined);
+        const response = await analyzeText(text, lang, image || undefined);
         setConcepts(response.concepts);
         saveToHistory({ type: 'concepts', text: text.substring(0, 100), results: response.concepts, timestamp: new Date().toISOString() });
       } else {
-        const response = await analyzeOverview(text, outputLanguage, image || undefined);
+        const response = await analyzeOverview(text, lang, image || undefined);
         setOverview(response.overview);
         saveToHistory({ type: 'overview', text: text.substring(0, 100), results: response.overview, timestamp: new Date().toISOString() });
       }
