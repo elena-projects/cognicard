@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BookOpen, Brain, Sparkles, Send, Loader2, ChevronRight, ChevronLeft, X, AlertCircle, FileText, Target, Microscope, Users, Upload, FileUp, Image as ImageIcon, History, Clock, Trash2, Copy, Check, Download, MessageSquare, Share2, Sun, Moon, GraduationCap, HelpCircle, PlusCircle, Waypoints } from 'lucide-react';
 import * as pdfjs from 'pdfjs-dist';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import mammoth from 'mammoth';
 import ReactMarkdown from 'react-markdown';
 import { analyzeText, analyzeOverview, analyzeConceptDeepDive, askDocumentQuestion, Concept, DocumentOverview, ImagePart, DeepDiveData } from './services/geminiService';
@@ -12,8 +13,8 @@ import ReviewDeck from './ReviewDeck';
 import ConceptMap from './ConceptMap';
 import './index.css';
 
-// Set up PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.7.284/pdf.worker.min.mjs`;
+// Set up PDF.js worker — bundled locally (same-origin) so it loads even where the CDN is blocked/slow.
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 type AnalysisType = 'concepts' | 'overview';
 
