@@ -1,8 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BookOpen, Brain, Sparkles, Send, Loader2, ChevronRight, ChevronLeft, X, AlertCircle, FileText, Target, Microscope, Users, Upload, FileUp, Image as ImageIcon, History, Clock, Trash2, Copy, Check, Download, MessageSquare, Share2, Sun, Moon, GraduationCap, HelpCircle, PlusCircle, Waypoints } from 'lucide-react';
-import * as pdfjs from 'pdfjs-dist';
-import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import mammoth from 'mammoth';
 import ReactMarkdown from 'react-markdown';
 import { analyzeText, analyzeOverview, analyzeConceptDeepDive, askDocumentQuestion, Concept, DocumentOverview, ImagePart, DeepDiveData } from './services/geminiService';
@@ -12,12 +10,6 @@ import Quiz from './Quiz';
 import ReviewDeck from './ReviewDeck';
 import ConceptMap from './ConceptMap';
 import './index.css';
-
-// Set up PDF.js worker — create the module worker ourselves and hand it to pdf.js as a
-// workerPort. Using workerSrc made pdf.js fall back to its "fake worker" (a main-thread
-// dynamic import()) which failed ("Failed to fetch dynamically imported module"); giving it
-// a ready worker avoids that path entirely. The worker is bundled locally (same-origin).
-pdfjs.GlobalWorkerOptions.workerPort = new Worker(pdfWorkerUrl, { type: 'module' });
 
 // Detect whether the source text is predominantly Chinese, so the analysis output
 // (concepts, definitions, overview) comes back in the SAME language the user pasted.
@@ -461,64 +453,30 @@ const App: React.FC = () => {
       reader.readAsDataURL(file);
     } 
     else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+      const zh = outputLanguage === 'Chinese';
+      // Gemini 2.5 reads PDFs natively (both text-based AND scanned/photographed), so hand the file
+      // straight to it rather than parsing in-browser with pdf.js (which hung/failed on some devices).
+      if (file.size > 18 * 1024 * 1024) {
+        setError(zh ? '这个 PDF 太大了（请小于 18MB，或直接把文字粘贴进来）。' : 'This PDF is too large (keep it under 18MB, or paste the text in).');
+        return;
+      }
       setIsReadingFile(true);
       const reader = new FileReader();
-      reader.onload = async (event) => {
-        const zh = outputLanguage === 'Chinese';
+      reader.onload = (event) => {
         try {
-          const typedarray = new Uint8Array(event.target?.result as ArrayBuffer);
-          const pdf = await pdfjs.getDocument({ data: typedarray }).promise;
-          // Extract pages in PARALLEL (much faster than page-by-page), capped so a huge PDF stays quick.
-          const MAX_PAGES = 50;
-          const pageCount = Math.min(pdf.numPages, MAX_PAGES);
-          const pageTexts = await Promise.all(
-            Array.from({ length: pageCount }, (_, i) =>
-              pdf.getPage(i + 1).then((p) => p.getTextContent()).then((tc) => tc.items.map((it: any) => it.str).join(' '))
-            )
-          );
-          const fullText = pageTexts.join('\n');
-          if (!fullText.trim()) {
-            // No text layer (scanned / image PDF) → render the first pages to an image and let
-            // Gemini read them (OCR). Gemini is multimodal, so this handles photographed textbooks.
-            const OCR_PAGES = Math.min(pdf.numPages, 3);
-            const scale = 1.6;
-            const canvases: HTMLCanvasElement[] = [];
-            let totalH = 0, maxW = 0;
-            for (let i = 1; i <= OCR_PAGES; i++) {
-              const page = await pdf.getPage(i);
-              const viewport = page.getViewport({ scale });
-              const c = document.createElement('canvas');
-              c.width = Math.floor(viewport.width); c.height = Math.floor(viewport.height);
-              await page.render({ canvasContext: c.getContext('2d')!, viewport }).promise;
-              canvases.push(c); totalH += c.height; maxW = Math.max(maxW, c.width);
-            }
-            const stitched = document.createElement('canvas');
-            stitched.width = maxW; stitched.height = totalH;
-            const sctx = stitched.getContext('2d')!;
-            sctx.fillStyle = '#ffffff'; sctx.fillRect(0, 0, maxW, totalH);
-            let y = 0;
-            for (const c of canvases) { sctx.drawImage(c, 0, y); y += c.height; }
-            const base64 = stitched.toDataURL('image/jpeg', 0.82).split(',')[1];
-            const imgPart = { inlineData: { data: base64, mimeType: 'image/jpeg' } };
-            setSelectedImage(imgPart);
-            executeAnalysis('', imgPart, analysisType);
-            return;
-          }
-          setInputText(fullText);
-          executeAnalysis(fullText, selectedImage, analysisType);
+          const result = event.target?.result as string;
+          const base64 = result.includes(',') ? result.split(',')[1] : result;
+          const pdfPart = { inlineData: { data: base64, mimeType: 'application/pdf' } };
+          setSelectedImage(pdfPart);
+          executeAnalysis('', pdfPart, analysisType);
         } catch (err: any) {
-          console.error('PDF parsing error:', err);
-          const m = String(err?.message || err || '');
-          if (err?.name === 'PasswordException' || /password/i.test(m)) {
-            setError(zh ? '这个 PDF 有密码保护，读不了。请去掉密码后再上传。' : 'This PDF is password-protected — remove the password and try again.');
-          } else {
-            setError((zh ? '读取 PDF 失败：' : 'Failed to read this PDF: ') + (m.slice(0, 140) || 'unknown error'));
-          }
+          setError((zh ? '读取 PDF 失败：' : 'Failed to read this PDF: ') + String(err?.message || err || ''));
         } finally {
           setIsReadingFile(false);
         }
       };
-      reader.readAsArrayBuffer(file);
+      reader.onerror = () => { setError(zh ? '读取文件失败，请重试。' : 'Failed to read the file — please try again.'); setIsReadingFile(false); };
+      reader.readAsDataURL(file);
     }
     else if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || file.name.endsWith('.docx')) {
       setIsReadingFile(true);
