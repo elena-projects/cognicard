@@ -468,12 +468,15 @@ const App: React.FC = () => {
         try {
           const typedarray = new Uint8Array(event.target?.result as ArrayBuffer);
           const pdf = await pdfjs.getDocument({ data: typedarray }).promise;
-          let fullText = '';
-          for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const textContent = await page.getTextContent();
-            fullText += textContent.items.map((item: any) => item.str).join(' ') + '\n';
-          }
+          // Extract pages in PARALLEL (much faster than page-by-page), capped so a huge PDF stays quick.
+          const MAX_PAGES = 50;
+          const pageCount = Math.min(pdf.numPages, MAX_PAGES);
+          const pageTexts = await Promise.all(
+            Array.from({ length: pageCount }, (_, i) =>
+              pdf.getPage(i + 1).then((p) => p.getTextContent()).then((tc) => tc.items.map((it: any) => it.str).join(' '))
+            )
+          );
+          const fullText = pageTexts.join('\n');
           if (!fullText.trim()) {
             // The PDF opened fine but has no text layer — almost always a scanned/image PDF.
             setError(zh
