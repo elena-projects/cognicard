@@ -478,10 +478,30 @@ const App: React.FC = () => {
           );
           const fullText = pageTexts.join('\n');
           if (!fullText.trim()) {
-            // The PDF opened fine but has no text layer — almost always a scanned/image PDF.
-            setError(zh
-              ? '这个 PDF 里没有可提取的文字（多半是扫描/图片版）。请换成文字版 PDF，或直接把文字粘贴进来。'
-              : 'This PDF has no selectable text (it looks like scanned images). Use a text-based PDF, or paste the text in instead.');
+            // No text layer (scanned / image PDF) → render the first pages to an image and let
+            // Gemini read them (OCR). Gemini is multimodal, so this handles photographed textbooks.
+            const OCR_PAGES = Math.min(pdf.numPages, 3);
+            const scale = 1.6;
+            const canvases: HTMLCanvasElement[] = [];
+            let totalH = 0, maxW = 0;
+            for (let i = 1; i <= OCR_PAGES; i++) {
+              const page = await pdf.getPage(i);
+              const viewport = page.getViewport({ scale });
+              const c = document.createElement('canvas');
+              c.width = Math.floor(viewport.width); c.height = Math.floor(viewport.height);
+              await page.render({ canvasContext: c.getContext('2d')!, viewport }).promise;
+              canvases.push(c); totalH += c.height; maxW = Math.max(maxW, c.width);
+            }
+            const stitched = document.createElement('canvas');
+            stitched.width = maxW; stitched.height = totalH;
+            const sctx = stitched.getContext('2d')!;
+            sctx.fillStyle = '#ffffff'; sctx.fillRect(0, 0, maxW, totalH);
+            let y = 0;
+            for (const c of canvases) { sctx.drawImage(c, 0, y); y += c.height; }
+            const base64 = stitched.toDataURL('image/jpeg', 0.82).split(',')[1];
+            const imgPart = { inlineData: { data: base64, mimeType: 'image/jpeg' } };
+            setSelectedImage(imgPart);
+            executeAnalysis('', imgPart, analysisType);
             return;
           }
           setInputText(fullText);
