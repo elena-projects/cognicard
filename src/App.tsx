@@ -559,6 +559,9 @@ const App: React.FC = () => {
 
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}
+              aria-label={outputLanguage === 'Chinese'
+                ? (isDarkMode ? '切换到浅色模式' : '切换到深色模式')
+                : (isDarkMode ? 'Switch to light mode' : 'Switch to dark mode')}
               className="p-2.5 rounded-xl bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all active:scale-95"
             >
               {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
@@ -567,6 +570,7 @@ const App: React.FC = () => {
             <div className="relative flex items-center">
               <button
                 onClick={() => setShowReview(true)}
+                aria-label={t.reviewBtn}
                 className="p-3 rounded-full text-gray-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-all active:scale-95 group/rev relative"
               >
                 <GraduationCap size={26} />
@@ -580,6 +584,7 @@ const App: React.FC = () => {
             <div className="relative flex items-center">
               <button
                 onClick={() => setShowHistory(true)}
+                aria-label={t.vault}
                 className="p-3 rounded-full text-gray-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-all active:scale-95 group/vault"
               >
                 <History size={26} />
