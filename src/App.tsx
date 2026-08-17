@@ -9,6 +9,7 @@ import FocusReader from './FocusReader';
 import Quiz from './Quiz';
 import ReviewDeck from './ReviewDeck';
 import ConceptMap from './ConceptMap';
+import FeedbackWidget from './FeedbackWidget';
 import './index.css';
 
 // Detect whether the source text is predominantly Chinese, so the analysis output
@@ -1074,6 +1075,9 @@ const App: React.FC = () => {
       {showReview && (
         <ReviewDeck lang={outputLanguage} onClose={() => { setShowReview(false); setDeckDue(dueCount()); }} />
       )}
+
+      {/* always-available way to tell me what worked and what didn't */}
+      <FeedbackWidget lang={outputLanguage} />
     </div>
   );
 };
