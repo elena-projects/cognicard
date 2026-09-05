@@ -47,7 +47,19 @@ const App: React.FC = () => {
   const [userQuestion, setUserQuestion] = useState('');
   const [isAnswering, setIsAnswering] = useState(false);
   const [allConceptsCopied, setAllConceptsCopied] = useState(false);
-  const [outputLanguage, setOutputLanguage] = useState<'English' | 'Chinese'>(() => (typeof navigator !== 'undefined' && (navigator.language || '').toLowerCase().startsWith('zh')) ? 'Chinese' : 'English');
+  // Remembered like the theme is: most readers come back in the same language, and
+  // re-picking it on every visit is the kind of small friction that adds up.
+  const [outputLanguage, setOutputLanguage] = useState<'English' | 'Chinese'>(() => {
+    try {
+      const saved = localStorage.getItem('cognicard_lang');
+      if (saved === 'English' || saved === 'Chinese') return saved;
+    } catch { /* private mode */ }
+    return (typeof navigator !== 'undefined' && (navigator.language || '').toLowerCase().startsWith('zh')) ? 'Chinese' : 'English';
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem('cognicard_lang', outputLanguage); } catch { /* private mode */ }
+  }, [outputLanguage]);
   const [showReader, setShowReader] = useState(false);
   const [showQuiz, setShowQuiz] = useState(false);
   const [showReview, setShowReview] = useState(false);
