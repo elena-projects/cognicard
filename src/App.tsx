@@ -440,9 +440,11 @@ const App: React.FC = () => {
 
     setError(null);
 
-    const MAX_FILE_SIZE = 4 * 1024 * 1024; 
+    // Gemini takes an inline request up to ~20MB and base64 inflates by a third,
+    // so ~14MB of original file is the real ceiling. nginx allows 25MB to leave room.
+    const MAX_FILE_SIZE = 14 * 1024 * 1024;
     if (file.size > MAX_FILE_SIZE) {
-      setError('File is too large. Please upload an image or document under 4MB.');
+      setError(outputLanguage === 'Chinese' ? '文件太大了（请小于 14MB，或直接把文字粘贴进来）。' : 'That file is too large — keep it under 14MB, or paste the text in.');
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
@@ -469,8 +471,8 @@ const App: React.FC = () => {
       const zh = outputLanguage === 'Chinese';
       // Gemini 2.5 reads PDFs natively (both text-based AND scanned/photographed), so hand the file
       // straight to it rather than parsing in-browser with pdf.js (which hung/failed on some devices).
-      if (file.size > 18 * 1024 * 1024) {
-        setError(zh ? '这个 PDF 太大了（请小于 18MB，或直接把文字粘贴进来）。' : 'This PDF is too large (keep it under 18MB, or paste the text in).');
+      if (file.size > 14 * 1024 * 1024) {
+        setError(zh ? '这个 PDF 太大了（请小于 14MB，或直接把文字粘贴进来）。' : 'This PDF is too large (keep it under 14MB, or paste the text in).');
         return;
       }
       setIsReadingFile(true);
